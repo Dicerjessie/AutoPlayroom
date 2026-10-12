@@ -5,6 +5,7 @@ or allows selecting with --game farkle / --game uno.
 """
 
 import sys
+import time
 import argparse
 import re
 import qc_desktop
@@ -12,14 +13,17 @@ import win32gui
 import win32con
 import ctypes
 
-def detect_current_game():
+def get_qc_window():
     hwnd_main = None
     def find_top(h, _):
         nonlocal hwnd_main
         if "QuentinC Gameroom" in win32gui.GetWindowText(h):
             hwnd_main = h
     win32gui.EnumWindows(find_top, None)
+    return hwnd_main
 
+def detect_current_game():
+    hwnd_main = get_qc_window()
     if not hwnd_main:
         return None
 
@@ -49,9 +53,14 @@ def detect_current_game():
         if any(k in recent_text for k in ["uno", "shuffles the cards", "draws", "skip", "reverse", "interception"]):
             return "uno"
 
-    return "uno"  # default fallback if undetermined
+    return None
 
-if __name__ == "__main__":
+def main():
+    print("=" * 60)
+    print("   AutoPlayroom - Autonomous Farkle & Uno Bot")
+    print("   for Quentin C's Gameroom")
+    print("=" * 60)
+
     parser = argparse.ArgumentParser(description="Autonomous Playroom Bot (Farkle & Uno)")
     parser.add_argument("--game", choices=["farkle", "uno", "auto"], default="auto", help="Game to play (default: auto)")
     parser.add_argument("--delay", type=float, default=0.2, help="Move delay in seconds (default: 0.2)")
@@ -63,11 +72,33 @@ if __name__ == "__main__":
     parser.add_argument("--straights", action="store_true", help="Enable straights chaining (Uno)")
     args = parser.parse_args()
 
+    # Step 1: Wait for Gameroom client if not yet running
+    if not get_qc_window():
+        print("⏳ Waiting for Quentin C's Gameroom (qcgc.exe) to open... (Press Ctrl+C to cancel)")
+        while not get_qc_window():
+            time.sleep(1.0)
+        print("✓ Connected to Quentin C's Gameroom!")
+
     game = args.game
     if game == "auto":
+        print("🔍 Detecting game table...")
         detected = detect_current_game()
-        print(f"🔍 Auto-detected game table: {detected.upper() if detected else 'None'}")
-        game = detected or "uno"
+        
+        # If table not yet recognized, poll briefly before falling back
+        if not detected:
+            print("⏳ Waiting for game table activity (Farkle / Uno)...")
+            for _ in range(5):
+                time.sleep(1.0)
+                detected = detect_current_game()
+                if detected:
+                    break
+
+        if detected:
+            print(f"✓ Detected game table: {detected.upper()}")
+            game = detected
+        else:
+            print("ℹ Table undetermined. Defaulting to Uno mode.")
+            game = "uno"
 
     if game == "farkle":
         from autofarkle import FarkleBot
@@ -86,3 +117,27 @@ if __name__ == "__main__":
             straights=args.straights
         )
         bot.run()
+
+def should_pause_on_exit():
+    if not getattr(sys, 'frozen', False):
+        return False
+    try:
+        arr = (ctypes.c_uint * 2)()
+        count = ctypes.windll.kernel32.GetConsoleProcessList(arr, 2)
+        return count <= 1
+    except Exception:
+        return False
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n👋 AutoPlayroom stopped by user.")
+    except Exception as e:
+        print(f"\n❌ Error encountered: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        if should_pause_on_exit():
+            input("\nPress Enter to exit...")
+

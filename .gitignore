@@ -21,4 +21,9 @@ ENV/
 .idea/
 .vscode/
 *.sublime-project
-*.sublime-workspace
+# PyInstaller
+build/
+dist/
+*.spec
+*.exe
+
