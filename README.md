@@ -29,21 +29,20 @@ Based on the official [Quentin C's Uno Rules & Variations](http://qcsalon.net/en
 
 ---
 
-## Installation
+## Getting Started
 
-Clone the repository and install the required dependencies:
-
+### Option 1: Standalone Windows Executable (No Python Required)
+You do not need to install Python or any dependencies:
+1. Download `AutoPlayroom.exe` from the [Latest Release](https://github.com/Dicerjessie/AutoPlayroom/releases/latest).
+2. Double-click `AutoPlayroom.exe` or run it from the command line:
 ```powershell
-pip install -r requirements.txt
+.\AutoPlayroom.exe
 ```
 
----
-
-## Usage
-
-### Quick Start (Auto-Detection)
-Automatically detects whether you are at a Farkle or Uno table:
+### Option 2: Run from Python Source
+Clone the repository and install the dependencies:
 ```powershell
+pip install -r requirements.txt
 python bot.py
 ```
 
