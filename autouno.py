@@ -69,6 +69,12 @@ class UnoBot:
         self.current_round = 0
         self.in_intermission = False
 
+        self.was_my_turn = False
+        self.turn_count = 0
+        self.last_activity_time = time.time()
+        self.base_watchdog_interval = 1.2
+        self.watchdog_interval = 1.2
+
     def log(self, msg):
         print(msg, flush=True)
 
@@ -1005,6 +1011,53 @@ class UnoBot:
                 # DO NOT SEND SPACEBAR!
             return True
 
+    def tick(self):
+        if not self.hwnd_main or not win32gui.IsWindow(self.hwnd_main):
+            if not self.find_client():
+                return False
+
+        new_lines = self.read_new_history()
+        if new_lines:
+            self.last_activity_time = time.time()
+            self.watchdog_interval = self.base_watchdog_interval
+            self.parse_history_events(new_lines)
+            for l in new_lines:
+                if any(k in l.lower() for k in ["plays", "draws", "uno", "interception", "round", "wins", "buzzer", "wants", "chooses"]):
+                    self.log(f"   [Game] {l}")
+
+        items = self.get_menu_items()
+        if self.is_color_choice_menu(items):
+            self.handle_color_choice(items)
+            self.last_activity_time = time.time()
+            self.watchdog_interval = self.base_watchdog_interval
+        elif self.my_turn:
+            if len(items) == 0 or self.in_intermission:
+                return True
+            if not self.was_my_turn:
+                self.turn_count += 1
+                self.log(f"\n👉 [Turn {self.turn_count}] Executing move (Cards in hand: {len(items)})")
+                self.was_my_turn = True
+
+            self.step()
+            self.last_activity_time = time.time()
+            self.watchdog_interval = self.base_watchdog_interval
+        else:
+            if self.was_my_turn:
+                self.log("⏳ Turn completed. Waiting for opponent...")
+                self.was_my_turn = False
+                self.last_activity_time = time.time()
+                self.watchdog_interval = self.base_watchdog_interval
+
+            # Autonomous Turn Watchdog
+            if not self.in_intermission and len(items) > 0:
+                now = time.time()
+                if now - self.last_activity_time > self.watchdog_interval:
+                    self.send_key(0x54)  # VK_T
+                    self.last_activity_time = now
+                    self.watchdog_interval = min(self.watchdog_interval + 1.2, 4.0)
+
+        return True
+
     def run(self):
         self.log("=" * 60)
         self.log("   AutoUno - Autonomous Uno Player for Quentin C Gameroom")
@@ -1029,58 +1082,10 @@ class UnoBot:
         lines = self.read_new_history()
         self.parse_history_events(lines)
 
-        was_my_turn = False
-        turn_count = 0
-        last_activity_time = time.time()
-        base_watchdog_interval = 1.2
-        watchdog_interval = base_watchdog_interval
-
         try:
             while self.running:
-                new_lines = self.read_new_history()
-                if new_lines:
-                    last_activity_time = time.time()
-                    watchdog_interval = base_watchdog_interval
-                    self.parse_history_events(new_lines)
-                    for l in new_lines:
-                        if any(k in l.lower() for k in ["plays", "draws", "uno", "interception", "round", "wins", "buzzer", "wants", "chooses"]):
-                            self.log(f"   [Game] {l}")
-
-                items = self.get_menu_items()
-                if self.is_color_choice_menu(items):
-                    self.handle_color_choice(items)
-                    last_activity_time = time.time()
-                    watchdog_interval = base_watchdog_interval
-                elif self.my_turn:
-                    if len(items) == 0 or self.in_intermission:
-                        time.sleep(0.015)
-                        continue
-                    if not was_my_turn:
-                        turn_count += 1
-                        self.log(f"\n👉 [Turn {turn_count}] Executing move (Cards in hand: {len(items)})")
-                        was_my_turn = True
-
-                    self.step()
-                    last_activity_time = time.time()
-                    watchdog_interval = base_watchdog_interval
-                else:
-                    if was_my_turn:
-                        self.log("⏳ Turn completed. Waiting for opponent...")
-                        was_my_turn = False
-                        last_activity_time = time.time()
-                        watchdog_interval = base_watchdog_interval
-
-                    # Autonomous Turn Watchdog:
-                    # In QC Uno, after interceptions or certain plays, the server does not always print
-                    # "It's your turn." Querying 'T' asks the server to state the turn immediately.
-                    if not self.in_intermission and len(items) > 0:
-                        now = time.time()
-                        if now - last_activity_time > watchdog_interval:
-                            self.send_key(0x54)  # VK_T
-                            last_activity_time = now
-                            watchdog_interval = min(watchdog_interval + 1.2, 4.0)
-
-                    time.sleep(0.015)
+                self.tick()
+                time.sleep(0.015)
         except KeyboardInterrupt:
             self.log("\nAutoUno stopped by user.")
 

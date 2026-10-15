@@ -1,6 +1,15 @@
-# AutoPlayroom - Autonomous Farkle & Uno Bot for Quentin C's Gameroom
+# AutoPlayroom - Autonomous Multigame Bot for Quentin C's Gameroom
 
-AutoPlayroom is an intelligent, autonomous script suite that interfaces directly with Quentin C's Gameroom client (`qcgc.exe`) to play **Farkle** (10,000) and **Uno** in the background.
+AutoPlayroom is an intelligent, autonomous multi-game bot suite that interfaces directly with Quentin C's Gameroom client (`qcgc.exe`) to play **Farkle** (10,000), **Uno**, and **1000 Miles** (Mille Bornes) in the background.
+
+## Key Features
+
+- **Autonomous Table & Room Detection**:
+  - Automatically identifies whether you are in the **Main Room (Reception)**, at a **Supported Table** (Farkle, Uno, 1000 Miles), or at an **Unsupported Game Table** (e.g. Poker, Belote, Yahtzee, Scrabble).
+- **Dynamic Table Switching on the Fly**:
+  - Automatically switches engines as you move between tables. When you leave a table or join a different game, AutoPlayroom seamlessly adapts without needing a restart!
+- **Safe Main Room & Unsupported Game Idling**:
+  - Safely stands by when in the lobby or when playing unsupported casual games with friends, and instantly awakens the moment you join a supported game.
 
 ## Supported Games
 

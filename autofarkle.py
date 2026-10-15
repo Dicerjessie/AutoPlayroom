@@ -45,6 +45,8 @@ class FarkleBot:
         self.combos_taken_this_roll = 0
         self.current_turn_points = 0
         self.consecutive_bank_failures = 0
+        self.turns_played = 0
+        self.was_my_turn = False
 
     def log(self, msg):
         print(msg, flush=True)
@@ -452,6 +454,36 @@ class FarkleBot:
         time.sleep(self.delay)
         return True
 
+    def tick(self):
+        if not self.hwnd_main or not win32gui.IsWindow(self.hwnd_main):
+            if not self.find_client():
+                return False
+
+        items = self.get_farkle_menu_items()
+        is_my_turn = (len(items) > 0 and any(not it["disabled"] for it in items))
+
+        if is_my_turn:
+            if not self.was_my_turn:
+                self.turns_played += 1
+                self.combos_taken_this_roll = 0
+                self.log(f"\n👉 [Turn {self.turns_played}] It's your turn! (Score: {self.my_score} pts | Entered: {self.has_entered})")
+                self.was_my_turn = True
+
+            self.step()
+        else:
+            if self.was_my_turn:
+                self.log("⏳ Turn ended. Waiting for opponent...")
+                self.was_my_turn = False
+
+            new_lines = self.read_new_history()
+            if new_lines:
+                self.parse_history_events(new_lines)
+                for l in new_lines:
+                    if any(k in l.lower() for k in ["rolls the dice", "farkle", "fly away", "banks", "takes", "wins"]):
+                        self.log(f"   [Game] {l}")
+
+        return True
+
     def run(self, max_turns=None):
         self.log("=" * 60)
         self.log("   AutoFarkle - Autonomous Player for Quentin C Gameroom")
@@ -464,38 +496,14 @@ class FarkleBot:
         self.log(f"✓ Connected to Quentin C Gameroom! Player: {self.username}")
         self.log(f"✓ Score: {self.my_score} pts | Entered: {self.has_entered}")
         self.log(f"✓ Monitoring game table...\n")
-        
-        turns_played = 0
-        was_my_turn = False
-        
+
         try:
             while self.running:
-                items = self.get_farkle_menu_items()
-                is_my_turn = (len(items) > 0 and any(not it["disabled"] for it in items))
-
-                if is_my_turn:
-                    if not was_my_turn:
-                        turns_played += 1
-                        self.combos_taken_this_roll = 0
-                        self.log(f"\n👉 [Turn {turns_played}] It's your turn! (Score: {self.my_score} pts | Entered: {self.has_entered})")
-                        was_my_turn = True
-
-                    self.step()
-                else:
-                    if was_my_turn:
-                        self.log("⏳ Turn ended. Waiting for opponent...")
-                        was_my_turn = False
-                        if max_turns and turns_played >= max_turns:
-                            self.log(f"\nCompleted {turns_played} turn(s). Stopping as requested.")
-                            break
-                    
-                    new_lines = self.read_new_history()
-                    if new_lines:
-                        self.parse_history_events(new_lines)
-                        for l in new_lines:
-                            if any(k in l.lower() for k in ["rolls the dice", "farkle", "fly away", "banks", "takes", "wins"]):
-                                self.log(f"   [Game] {l}")
-                    time.sleep(0.4)
+                self.tick()
+                if max_turns and self.turns_played >= max_turns and not self.was_my_turn:
+                    self.log(f"\nCompleted {self.turns_played} turn(s). Stopping as requested.")
+                    break
+                time.sleep(0.04)
         except KeyboardInterrupt:
             self.log("\nAutoFarkle stopped by user.")
 

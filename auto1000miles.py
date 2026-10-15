@@ -114,6 +114,12 @@ class MilesBot:
         # Opponents tracking: name -> {miles, status, speed_limit, problems, immunities}
         self.opponents = {}
         self.scores = {}
+
+        self.was_my_turn = False
+        self.turn_count = 0
+        self.last_activity_time = time.time()
+        self.base_watchdog_interval = 1.4
+        self.watchdog_interval = 1.4
         
         self.hwnd_main = None
         self.hwnd_menu = None
@@ -836,6 +842,54 @@ class MilesBot:
             self.has_drawn_this_turn = False
         return success
 
+    def tick(self):
+        if not self.hwnd_main or not win32gui.IsWindow(self.hwnd_main):
+            if not self.find_client():
+                return False
+
+        new_lines = self.read_new_history()
+        if new_lines:
+            self.last_activity_time = time.time()
+            self.watchdog_interval = self.base_watchdog_interval
+            self.parse_history_events(new_lines)
+            for l in new_lines:
+                if any(k in l.lower() for k in ["plays", "joue", "draws", "tire", "dirty trick", "coup fourré", "round", "manche", "wins", "gagne", "miles", "bornes"]):
+                    self.log(f"   [Game] {l}")
+
+        items = self.get_menu_items()
+        if self.is_action_choice_menu(items):
+            # We might be in a dangling choice menu; hit Escape to return to hand
+            self.send_key(win32con.VK_ESCAPE)
+            time.sleep(0.08)
+            self.last_activity_time = time.time()
+        elif self.my_turn:
+            if len(items) == 0 or self.in_intermission:
+                return True
+            if not self.was_my_turn:
+                self.turn_count += 1
+                self.log(f"\n👉 [Turn {self.turn_count}] Executing move (Cards in hand: {len(items)}, Miles: {self.my_miles})")
+                self.was_my_turn = True
+
+            self.step()
+            self.last_activity_time = time.time()
+            self.watchdog_interval = self.base_watchdog_interval
+        else:
+            if self.was_my_turn:
+                self.log("⏳ Turn completed. Waiting for opponent...")
+                self.was_my_turn = False
+                self.last_activity_time = time.time()
+                self.watchdog_interval = self.base_watchdog_interval
+
+            # Turn Watchdog: query T key if stalled
+            if not self.in_intermission and len(items) > 0:
+                now = time.time()
+                if now - self.last_activity_time > self.watchdog_interval:
+                    self.send_key(0x54)  # VK_T
+                    self.last_activity_time = now
+                    self.watchdog_interval = min(self.watchdog_interval + 1.2, 4.0)
+
+        return True
+
     def run(self):
         self.log("=" * 60)
         self.log("   Auto1000Miles - Autonomous Player for Quentin C Gameroom")
@@ -856,57 +910,10 @@ class MilesBot:
         lines = self.read_new_history()
         self.parse_history_events(lines)
 
-        was_my_turn = False
-        turn_count = 0
-        last_activity_time = time.time()
-        base_watchdog_interval = 1.4
-        watchdog_interval = base_watchdog_interval
-
         try:
             while self.running:
-                new_lines = self.read_new_history()
-                if new_lines:
-                    last_activity_time = time.time()
-                    watchdog_interval = base_watchdog_interval
-                    self.parse_history_events(new_lines)
-                    for l in new_lines:
-                        if any(k in l.lower() for k in ["plays", "joue", "draws", "tire", "dirty trick", "coup fourré", "round", "manche", "wins", "gagne", "miles", "bornes"]):
-                            self.log(f"   [Game] {l}")
-
-                items = self.get_menu_items()
-                if self.is_action_choice_menu(items):
-                    # We might be in a dangling choice menu; hit Escape to return to hand
-                    self.send_key(win32con.VK_ESCAPE)
-                    time.sleep(0.08)
-                    last_activity_time = time.time()
-                elif self.my_turn:
-                    if len(items) == 0 or self.in_intermission:
-                        time.sleep(0.02)
-                        continue
-                    if not was_my_turn:
-                        turn_count += 1
-                        self.log(f"\n👉 [Turn {turn_count}] Executing move (Cards in hand: {len(items)}, Miles: {self.my_miles})")
-                        was_my_turn = True
-
-                    self.step()
-                    last_activity_time = time.time()
-                    watchdog_interval = base_watchdog_interval
-                else:
-                    if was_my_turn:
-                        self.log("⏳ Turn completed. Waiting for opponent...")
-                        was_my_turn = False
-                        last_activity_time = time.time()
-                        watchdog_interval = base_watchdog_interval
-
-                    # Turn Watchdog: query T key if stalled
-                    if not self.in_intermission and len(items) > 0:
-                        now = time.time()
-                        if now - last_activity_time > watchdog_interval:
-                            self.send_key(0x54)  # VK_T
-                            last_activity_time = now
-                            watchdog_interval = min(watchdog_interval + 1.2, 4.0)
-
-                    time.sleep(0.02)
+                self.tick()
+                time.sleep(0.02)
         except KeyboardInterrupt:
             self.log("\nAuto1000Miles stopped by user.")
 
