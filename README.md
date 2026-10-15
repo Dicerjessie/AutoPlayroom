@@ -27,6 +27,22 @@ Based on the official [Quentin C's Uno Rules & Variations](http://qcsalon.net/en
   - **Point Minimization Strategy**: Sheds higher-value number cards first to minimize penalty points if an opponent goes out.
   - **Automatic Drawing**: Automatically draws via `Spacebar` when no playable card exists.
 
+### 3. 1000 Miles / Mille Bornes (`auto1000miles.py`)
+Based on the official [Quentin C's 1000 Miles Rules](http://qcsalon.net/en/1000miles):
+- **Precision Racing Engine**:
+  - Exact 1000 miles victory calculation (prevents overshooting).
+  - Enforces the top gear rule (maximum two 200-mile cards per round).
+  - Automatically respects speed limit restrictions (restricts to 25/50 miles).
+- **Sub-50ms Dirty Trick (Coup Fourré) Engine**:
+  - Instantly responds to opponent attacks with matching immunities out of turn (`Right of way`, `Extra tank`, `Puncture-proof`, `Driving ace`).
+  - Completely cancels attacks, steals turn, and claims +300 bonus points.
+- **Smart Defense & Problem Resolution**:
+  - Automatically cures problems in optimal order (`Gasoline` for out of gas, `Spare tire` for flats, `Repairs` for accidents, `Green light` for red lights/start, `End of speed limit`).
+- **Threat Targeting**:
+  - Tracks opponent mileage in real time and directs attacks (`Red light`, `Accident`, `Out of gas`, `Flat tire`, `Speed limit`) toward the leading active opponent.
+- **Strategic Discard Engine**:
+  - Intelligently discards unplayable distance cards exceeding required miles, redundant defenses for immunities already held, and duplicate cards when blocked.
+
 ---
 
 ## Getting Started
@@ -47,6 +63,15 @@ python bot.py
 ```
 
 ### Launch Specifically by Game
+To play 1000 Miles:
+```powershell
+python auto1000miles.py
+```
+or
+```powershell
+python bot.py --game miles
+```
+
 To play Uno:
 ```powershell
 python autouno.py
@@ -68,6 +93,11 @@ python bot.py --game farkle
 ---
 
 ## Options & Arguments
+
+### 1000 Miles Options (`auto1000miles.py` / `bot.py --game miles`)
+| Flag | Description | Default |
+|---|---|---|
+| `--delay <sec>` | Delay in seconds between actions | `0.2` |
 
 ### Uno Options (`autouno.py` / `bot.py --game uno`)
 | Flag | Description | Default |

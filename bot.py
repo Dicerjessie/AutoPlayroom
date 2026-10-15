@@ -50,6 +50,8 @@ def detect_current_game():
         
         if any(k in recent_text for k in ["farkle", "dice", "points to enter", "points to bank", "rolls the dice"]):
             return "farkle"
+        if any(k in recent_text for k in ["1000 miles", "mille bornes", "bornes", "green light", "feu vert", "red light", "feu rouge", "driving ace", "spare tire", "flat tire", "out of gas", "speed limit", "right of way", "coup fourré"]):
+            return "miles"
         if any(k in recent_text for k in ["uno", "shuffles the cards", "draws", "skip", "reverse", "interception"]):
             return "uno"
 
@@ -57,12 +59,12 @@ def detect_current_game():
 
 def main():
     print("=" * 60)
-    print("   AutoPlayroom - Autonomous Farkle & Uno Bot")
+    print("   AutoPlayroom - Autonomous Farkle, Uno & 1000 Miles Bot")
     print("   for Quentin C's Gameroom")
     print("=" * 60)
 
-    parser = argparse.ArgumentParser(description="Autonomous Playroom Bot (Farkle & Uno)")
-    parser.add_argument("--game", choices=["farkle", "uno", "auto"], default="auto", help="Game to play (default: auto)")
+    parser = argparse.ArgumentParser(description="Autonomous Playroom Bot (Farkle, Uno & 1000 Miles)")
+    parser.add_argument("--game", choices=["farkle", "uno", "miles", "1000miles", "auto"], default="auto", help="Game to play (default: auto)")
     parser.add_argument("--delay", type=float, default=0.2, help="Move delay in seconds (default: 0.2)")
     parser.add_argument("--turns", type=int, default=None, help="Max turns (Farkle only)")
     parser.add_argument("--aggressive", action="store_true", help="Play aggressively (Farkle)")
@@ -86,7 +88,7 @@ def main():
         
         # If table not yet recognized, poll briefly before falling back
         if not detected:
-            print("⏳ Waiting for game table activity (Farkle / Uno)...")
+            print("⏳ Waiting for game table activity (Farkle / Uno / 1000 Miles)...")
             for _ in range(5):
                 time.sleep(1.0)
                 detected = detect_current_game()
@@ -116,6 +118,10 @@ def main():
             anti_bluff=not args.allow_bluff,
             straights=args.straights
         )
+        bot.run()
+    elif game in ["miles", "1000miles"]:
+        from auto1000miles import MilesBot
+        bot = MilesBot(delay=args.delay)
         bot.run()
 
 def should_pause_on_exit():
